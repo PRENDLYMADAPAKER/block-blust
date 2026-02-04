@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Block Blust</title>
+
+<style>
+:root{
+  --bg:#0b1020;
+  --panel:#121936;
+  --accent:#7c3aed;
+  --line:rgba(255,255,255,.1);
+  --text:#eef2ff;
+  --muted:#aab0d9;
+}
+*{box-sizing:border-box}
+html,body{margin:0;overscroll-behavior:none;background:var(--bg);color:var(--text);font-family:system-ui}
+
+.wrap{
+  max-width:1100px;
+  margin:auto;
+  padding:14px;
+  display:grid;
+  grid-template-columns:1.3fr .7fr;
+  gap:14px;
+}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+
+.card{
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+  border:1px solid var(--line);
+  border-radius:18px;
+  overflow:hidden;
+}
+
+.hd{
+  padding:12px 14px;
+  border-bottom:1px solid var(--line);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.badge{
+  font-size:12px;
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  color:var(--muted);
+}
+
+.bd{padding:14px}
+
+button{
+  background:rgba(124,58,237,.2);
+  border:1px solid var(--line);
+  color:var(--text);
+  padding:8px 12px;
+  border-radius:12px;
+  font-weight:800;
+}
+button.secondary{background:rgba(255,255,255,.08)}
+button:disabled{opacity:.45}
+
+.hud{display:flex;gap:10px;flex-wrap:wrap}
+.stat{
+  background:rgba(0,0,0,.25);
+  padding:10px 12px;
+  border-radius:14px;
+  min-width:140px;
+}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-size:20px;font-weight:900}
+
+.board{
+  width:100%;
+  max-width:520px;
+  aspect-ratio:1/1;
+  margin:12px auto;
+  background:#0e1430;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:10px;
+  display:grid;
+  grid-template-columns:repeat(10,1fr);
+  gap:6px;
+  touch-action:none;
+}
+
+.cell{
+  border-radius:10px;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);
+  position:relative;
+}
+.cell.filled{
+  background:linear-gradient(180deg,#8b5cf6,#6d28d9);
+}
+.cell.preview-ok::after{
+  content:"";position:absolute;inset:0;
+  border-radius:10px;
+  background:rgba(34,197,94,.25);
+}
+.cell.preview-bad::after{
+  content:"";position:absolute;inset:0;
+  border-radius:10px;
+  background:rgba(239,68,68,.25);
+}
+.cell.snap{animation:snap .12s ease-out}
+@keyframes snap{from{transform:scale(1.15)}to{transform:scale(1)}}
+
+.pieces{
+  display:flex;
+  justify-content:center;
+  gap:12px;
+  margin-top:10px;
+}
+.piece{
+  background:rgba(0,0,0,.25);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:10px;
+  cursor:grab;
+}
+.pieceGrid{
+  display:grid;
+  grid-template-columns:repeat(5,16px);
+  gap:4px;
+}
+.pCell{
+  width:16px;height:16px;border-radius:5px;
+  background:rgba(255,255,255,.08);
+}
+.pCell.on{background:#8b5cf6}
+
+.hint{text-align:center;font-size:12px;color:var(--muted)}
+
+.lbItem{
+  display:flex;
+  justify-content:space-between;
+  padding:10px;
+  border-radius:12px;
+  border:1px solid var(--line);
+  margin-bottom:8px;
+  background:rgba(0,0,0,.25);
+}
+
+/* floating ghost */
+.drag-ghost{
+  position:fixed;
+  left:0;top:0;
+  z-index:2147483647;
+  pointer-events:none;
+  transform:translate3d(-9999px,-9999px,0);
+  will-change:transform;
+  filter:drop-shadow(0 14px 30px rgba(0,0,0,.45));
+}
+
+/* particles */
+#fxCanvas{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:2147483646;
+}
+</style>
+</head>
+
+<body>
+<canvas id="fxCanvas"></canvas>
+<div id="dragGhost" class="drag-ghost"></div>
+
+<div class="wrap">
+<section class="card">
+  <div class="hd">
+    <b>Block Blust</b>
+    <span class="badge">Smooth • Floating Drag</span>
+  </div>
+
+  <div class="bd">
+    <div class="hud">
+      <div class="stat"><div class="k">Score</div><div class="v" id="score">0</div></div>
+      <div class="stat"><div class="k">Best</div><div class="v" id="best">0</div></div>
+      <button id="btnNew" class="secondary">New</button>
+      <button id="btnSubmit">Submit</button>
+    </div>
+
+    <div id="board" class="board"></div>
+    <div id="pieces" class="pieces"></div>
+    <div class="hint" id="hint">Drag a block like the real game</div>
+  </div>
+</section>
+
+<aside class="card">
+  <div class="hd">
+    <b>Leaderboard</b>
+    <span class="badge" id="lbStatus">Today</span>
+  </div>
+  <div class="bd" id="lb"></div>
+</aside>
+  </div>
+
+  <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { getDatabase, ref, set, get, query, orderByChild, limitToLast, onValue } 
+from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+const firebaseConfig={
+  apiKey:"AIzaSyAD8VpswsHl3BJJ7Pdr8Mrh_s8Uw5ZnubE",
+  authDomain:"block-blust-6f8bc.firebaseapp.com",
+  databaseURL:"https://block-blust-6f8bc-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"block-blust-6f8bc",
+  appId:"1:47988932434:web:6f9b15ff37f8c3c478c48b"
+};
+
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
+
+const SIZE=10;
+const boardEl=document.getElementById("board");
+const piecesEl=document.getElementById("pieces");
+const scoreEl=document.getElementById("score");
+const bestEl=document.getElementById("best");
+const ghost=document.getElementById("dragGhost");
+const fx=document.getElementById("fxCanvas");
+const ctx=fx.getContext("2d");
+
+let grid=[...Array(SIZE)].map(()=>Array(SIZE).fill(0));
+let score=0;
+let best=+localStorage.getItem("bb_best")||0;
+bestEl.textContent=best;
+
+const SHAPES=[
+ [[0,0]],[[0,0],[1,0]],[[0,0],[0,1]],[[0,0],[1,0],[0,1],[1,1]],
+ [[0,0],[1,0],[2,0]],[[0,0],[0,1],[0,2]],
+ [[0,0],[1,0],[2,0],[1,1]]
+];
+
+function randomPiece(){
+  const s=SHAPES[Math.floor(Math.random()*SHAPES.length)];
+  return {cells:s};
+}
+
+let pieces=[randomPiece(),randomPiece(),randomPiece()];
+let drag=null, hover=null, offset={x:0,y:0};
+
+function render(){
+  boardEl.innerHTML="";
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
+    const d=document.createElement("div");
+    d.className="cell"+(grid[r][c]?" filled":"");
+    if(drag && hover){
+      drag.piece.cells.forEach(([dr,dc])=>{
+        if(hover.r+dr===r && hover.c+dc===c)
+          d.classList.add(canPlace(drag.piece,hover.r,hover.c)?"preview-ok":"preview-bad");
+      });
+    }
+    boardEl.appendChild(d);
+  }
+
+  piecesEl.innerHTML="";
+  pieces.forEach((p,i)=>{
+    if(!p) return;
+    const w=document.createElement("div");
+    w.className="piece";
+    const g=document.createElement("div");
+    g.className="pieceGrid";
+    for(let r=0;r<5;r++)for(let c=0;c<5;c++){
+      const pc=document.createElement("div");
+      pc.className="pCell";
+      p.cells.forEach(([dr,dc])=>{
+        if(dr===r && dc===c) pc.classList.add("on");
+      });
+      g.appendChild(pc);
+    }
+    w.appendChild(g);
+    w.onpointerdown=e=>{
+      const rect=w.getBoundingClientRect();
+      offset={x:e.clientX-rect.left,y:e.clientY-rect.top};
+      drag={idx:i,piece:p};
+      ghost.innerHTML="";
+      ghost.appendChild(w.cloneNode(true));
+      moveGhost(e.clientX,e.clientY);
+    };
+    piecesEl.appendChild(w);
+  });
+}
+render();
+
+function moveGhost(x,y){
+  ghost.style.transform=`translate3d(${x-offset.x}px,${y-offset.y}px,0)`;
+}
+
+function canPlace(p,r,c){
+  return p.cells.every(([dr,dc])=>{
+    const rr=r+dr,cc=c+dc;
+    return rr>=0&&rr<SIZE&&cc>=0&&cc<SIZE&&!grid[rr][cc];
+  });
+}
+
+window.onpointermove=e=>{
+  if(!drag) return;
+  moveGhost(e.clientX,e.clientY);
+  const rect=boardEl.getBoundingClientRect();
+  const x=e.clientX-rect.left,y=e.clientY-rect.top;
+  if(x>=0&&y>=0&&x<rect.width&&y<rect.height){
+    hover={r:Math.floor(y/(rect.height/SIZE)),c:Math.floor(x/(rect.width/SIZE))};
+    render();
+  }
+};
+
+window.onpointerup=e=>{
+  if(!drag) return;
+  if(hover && canPlace(drag.piece,hover.r,hover.c)){
+    drag.piece.cells.forEach(([dr,dc])=>{
+      grid[hover.r+dr][hover.c+dc]=1;
+    });
+    score+=drag.piece.cells.length*5;
+    scoreEl.textContent=score;
+    if(score>best){best=score;bestEl.textContent=best;localStorage.setItem("bb_best",best)}
+    pieces[drag.idx]=null;
+    if(pieces.every(p=>!p)) pieces=[randomPiece(),randomPiece(),randomPiece()];
+  }
+  drag=null;hover=null;
+  ghost.style.transform="translate3d(-9999px,-9999px,0)";
+  render();
+};
+</script>
+</body>
+</html>
