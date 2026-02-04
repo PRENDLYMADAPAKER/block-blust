@@ -1,0 +1,1236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Block Blust (Online)</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --text:#e8ecff;
+      --muted:#a8b1d6;
+      --line:rgba(255,255,255,.10);
+      --accent:#7c3aed;
+      --good:#22c55e;
+      --bad:#ef4444;
+      --shadow: 0 10px 35px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: radial-gradient(1000px 600px at 20% -10%, rgba(124,58,237,.35), transparent 60%),
+                  radial-gradient(1000px 700px at 90% 0%, rgba(34,197,94,.18), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+    }
+    .wrap{
+      max-width:1200px;
+      margin:0 auto;
+      padding:16px;
+      display:grid;
+      grid-template-columns: 1.25fr .75fr;
+      gap:14px;
+    }
+    @media (max-width: 980px){
+      .wrap{grid-template-columns:1fr}
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+    .card .hd{
+      padding:14px 14px 10px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      background: rgba(0,0,0,.12);
+    }
+    .title{
+      font-weight:900;
+      letter-spacing:.2px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .badge{
+      font-size:12px;
+      padding:4px 10px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      color:var(--muted);
+      background: rgba(0,0,0,.14);
+      white-space:nowrap;
+    }
+    .bd{padding:14px}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .muted{color:var(--muted)}
+    .ok{color: rgba(34,197,94,.95); font-weight:900}
+    .err{color: rgba(239,68,68,.95); font-weight:900}
+
+    button{
+      border:1px solid var(--line);
+      background: rgba(124,58,237,.18);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      font-weight:900;
+      cursor:pointer;
+    }
+    button:hover{filter:brightness(1.08)}
+    button.secondary{background: rgba(255,255,255,.06)}
+    button:disabled{opacity:.45; cursor:not-allowed}
+    .mini{font-size:12px; padding:6px 10px; border-radius:10px}
+
+    /* HUD */
+    .hud{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .stat{
+      background: rgba(0,0,0,.18);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:10px 12px;
+      min-width: 160px;
+    }
+    .stat .k{font-size:12px; color:var(--muted); font-weight:900}
+    .stat .v{font-size:20px; font-weight:900; margin-top:2px}
+
+    /* 10x10 Board */
+    .board{
+      width:100%;
+      max-width:560px;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+      background: rgba(0,0,0,.22);
+      border:1px solid var(--line);
+      border-radius: 20px;
+      padding:10px;
+      display:grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap:6px;
+      user-select:none;
+      touch-action: none; /* important for drag */
+      position:relative;
+    }
+    .cell{
+      border-radius: 10px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.06);
+      position:relative;
+      overflow:hidden;
+    }
+    .cell.filled{
+      background: linear-gradient(180deg, rgba(124,58,237,.85), rgba(124,58,237,.35));
+      border-color: rgba(255,255,255,.14);
+    }
+    .cell.preview-ok::after,
+    .cell.preview-bad::after{
+      content:"";
+      position:absolute; inset:0;
+      background: rgba(34,197,94,.25);
+      border:1px dashed rgba(34,197,94,.6);
+      border-radius:10px;
+    }
+    .cell.preview-bad::after{
+      background: rgba(239,68,68,.22);
+      border-color: rgba(239,68,68,.6);
+    }
+
+    /* Line-clear flash */
+    .cell.flash::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background: rgba(255,255,255,.22);
+      border-radius:12px;
+      animation: flash .28s ease-out forwards;
+    }
+    @keyframes flash{
+      from{opacity:1; transform:scale(1)}
+      to{opacity:0; transform:scale(1.2)}
+    }
+
+    /* Pieces */
+    .pieces{
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+    .piece{
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.16);
+      border-radius:16px;
+      padding:10px;
+      min-width: 140px;
+      cursor:grab;
+      transition: transform .08s ease, filter .08s ease;
+      user-select:none;
+      touch-action:none;
+      position:relative;
+    }
+    .piece:active{cursor:grabbing}
+    .piece:hover{filter:brightness(1.06)}
+    .piece.selected{
+      outline: 2px solid rgba(124,58,237,.85);
+      transform: translateY(-2px);
+    }
+    .pieceGrid{
+      display:grid;
+      grid-template-columns: repeat(5, 16px);
+      gap:4px;
+      justify-content:center;
+    }
+    .pCell{
+      width:16px; height:16px;
+      border-radius:5px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .pCell.on{
+      background: rgba(124,58,237,.85);
+      border-color: rgba(255,255,255,.14);
+    }
+    .hint{
+      text-align:center;
+      color:var(--muted);
+      font-size:12px;
+      font-weight:800;
+      margin-top:8px;
+    }
+
+    /* Ghost preview under finger */
+    .ghost{
+      position:fixed;
+      left:0; top:0;
+      transform: translate(-9999px, -9999px);
+      pointer-events:none;
+      z-index: 9999;
+      opacity:.92;
+      filter: drop-shadow(0 10px 24px rgba(0,0,0,.35));
+    }
+    .ghost .piece{
+      cursor:default;
+      transform:none;
+      outline:none;
+      background: rgba(0,0,0,.20);
+    }
+
+    /* Leaderboard */
+    .lb{display:flex; flex-direction:column; gap:10px;}
+    .lbItem{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background: rgba(0,0,0,.16);
+    }
+    .rank{font-weight:900; color:var(--muted); width:34px;}
+    .name{flex:1; font-weight:900; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+    .score{
+      font-weight:900;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      min-width:70px;
+      text-align:center;
+    }
+    .footerNote{font-size:12px; color:var(--muted); line-height:1.5;}
+
+    /* Auth gate */
+    .gate{
+      position:absolute;
+      inset:0;
+      background: rgba(5,8,18,.72);
+      backdrop-filter: blur(8px);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+    }
+    .gateCard{
+      width:min(540px, 100%);
+      border:1px solid var(--line);
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .gateHd{
+      padding:14px 14px 10px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      background: rgba(0,0,0,.18);
+    }
+    .gateBd{padding:14px}
+    .tabs{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+    .tab{
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      color:var(--muted);
+      font-weight:900;
+      cursor:pointer;
+      user-select:none;
+    }
+    .tab.active{
+      color:var(--text);
+      background: rgba(124,58,237,.22);
+      border-color: rgba(124,58,237,.45);
+    }
+    .form{display:grid; gap:10px;}
+    label{font-size:12px; color:var(--muted); font-weight:900;}
+    input{
+      width:100%;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.18);
+      color:var(--text);
+      outline:none;
+    }
+    input:focus{border-color: rgba(124,58,237,.55)}
+    .smallLink{
+      font-size:12px;
+      color: rgba(168,177,214,.95);
+      text-decoration: underline;
+      cursor:pointer;
+      user-select:none;
+    }
+    .msg{
+      font-size:12px;
+      line-height:1.4;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.18);
+    }
+
+    /* Toasts (combo) */
+    .toasts{
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%);
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      z-index: 10000;
+      pointer-events:none;
+      width: min(520px, calc(100% - 24px));
+    }
+    .toast{
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.35);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+      font-weight: 900;
+      letter-spacing:.2px;
+      opacity:0;
+      transform: translateY(10px);
+      animation: toastIn .16s ease-out forwards, toastOut .18s ease-in forwards;
+      animation-delay: 0s, 1.8s;
+    }
+    @keyframes toastIn{to{opacity:1; transform:translateY(0)}}
+    @keyframes toastOut{to{opacity:0; transform:translateY(10px)}}
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <section class="card" id="gameCard">
+      <div class="hd">
+        <div class="title">
+          Block Blust
+          <span class="badge">10x10 • drag & drop • daily leaderboard</span>
+        </div>
+        <div class="row">
+          <button id="btnLogout" class="mini secondary" style="display:none">Sign out</button>
+        </div>
+      </div>
+
+      <div class="bd">
+        <div class="hud">
+          <div class="stat">
+            <div class="k">Player</div>
+            <div class="v" id="playerName">—</div>
+          </div>
+          <div class="stat">
+            <div class="k">Score</div>
+            <div class="v" id="score">0</div>
+          </div>
+          <div class="stat">
+            <div class="k">Best (local)</div>
+            <div class="v" id="best">0</div>
+          </div>
+          <div class="row" style="margin-left:auto">
+            <button id="btnNew" class="secondary" disabled>New game</button>
+            <button id="btnSubmit" disabled>Submit score</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div id="board" class="board" aria-label="game board"></div>
+          <div class="pieces" id="pieces"></div>
+          <div class="hint" id="hint">Sign in to start playing.</div>
+        </div>
+      </div>
+
+      <!-- LOGIN GATE -->
+      <div class="gate" id="gate">
+        <div class="gateCard">
+          <div class="gateHd">
+            <div class="title">Sign in</div>
+            <span class="badge">required</span>
+          </div>
+          <div class="gateBd">
+            <div class="tabs">
+              <div class="tab active" id="tabSignIn">Sign in</div>
+              <div class="tab" id="tabSignUp">Sign up</div>
+              <div class="tab" id="tabReset">Reset</div>
+            </div>
+
+            <div class="row" style="margin-bottom:10px">
+              <button id="btnGoogle" style="flex:1">Continue with Google</button>
+            </div>
+
+            <div class="msg muted" style="margin-bottom:10px">
+              Or use email & password:
+            </div>
+
+            <div class="form">
+              <div id="nameWrap" style="display:none">
+                <label for="displayName">Display name</label>
+                <input id="displayName" autocomplete="name" placeholder="e.g., POPO" />
+              </div>
+
+              <div>
+                <label for="email">Email</label>
+                <input id="email" type="email" autocomplete="email" placeholder="you@email.com" />
+              </div>
+
+              <div id="passWrap">
+                <label for="password">Password</label>
+                <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+              </div>
+
+              <div class="row" style="justify-content:space-between">
+                <span class="smallLink" id="linkForgot">Forgot password?</span>
+                <span class="smallLink" id="linkBackSignIn" style="display:none">Back to Sign in</span>
+              </div>
+
+              <button id="btnEmailPrimary">Sign in</button>
+
+              <div id="authMsg" class="msg muted" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="card">
+      <div class="hd">
+        <div class="title">Leaderboard</div>
+        <span class="badge" id="lbBadge">Today</span>
+      </div>
+      <div class="bd">
+        <div class="row" style="justify-content:space-between; margin-bottom:10px">
+          <span class="muted" id="lbStatus">Loading…</span>
+          <div class="row">
+            <button id="btnLBToday" class="mini">Today</button>
+            <button id="btnLBAll" class="mini secondary">All-time</button>
+            <button id="btnRefresh" class="mini secondary">Refresh</button>
+          </div>
+        </div>
+        <div class="lb" id="lb"></div>
+        <div class="footerNote" style="margin-top:12px">
+          Today = per-day top scores. All-time = best-ever per user.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Ghost draggable piece -->
+  <div class="ghost" id="ghost"></div>
+
+  <!-- Toasts -->
+  <div class="toasts" id="toasts"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+  import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    sendPasswordResetEmail,
+    updateProfile
+  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+  import {
+    getDatabase,
+    ref,
+    set,
+    get,
+    query,
+    orderByChild,
+    limitToLast,
+    onValue,
+    off
+  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAD8VpswsHl3BJJ7Pdr8Mrh_s8Uw5ZnubE",
+    authDomain: "block-blust-6f8bc.firebaseapp.com",
+    databaseURL: "https://block-blust-6f8bc-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "block-blust-6f8bc",
+    storageBucket: "block-blust-6f8bc.firebasestorage.app",
+    messagingSenderId: "47988932434",
+    appId: "1:47988932434:web:6f9b15ff37f8c3c478c48b",
+    measurementId: "G-HCDESJ9VP4"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
+  const provider = new GoogleAuthProvider();
+
+  const $ = (id) => document.getElementById(id);
+
+  // UI
+  const elBoard = $("board");
+  const elPieces = $("pieces");
+  const elScore = $("score");
+  const elBest = $("best");
+  const elPlayerName = $("playerName");
+  const elHint = $("hint");
+
+  const btnLogout = $("btnLogout");
+  const btnNew = $("btnNew");
+  const btnSubmit = $("btnSubmit");
+  const btnRefresh = $("btnRefresh");
+  const btnLBToday = $("btnLBToday");
+  const btnLBAll = $("btnLBAll");
+  const lbBadge = $("lbBadge");
+
+  // Gate/Auth UI
+  const gate = $("gate");
+  const tabSignIn = $("tabSignIn");
+  const tabSignUp = $("tabSignUp");
+  const tabReset = $("tabReset");
+  const btnGoogle = $("btnGoogle");
+  const nameWrap = $("nameWrap");
+  const displayNameInput = $("displayName");
+  const emailInput = $("email");
+  const passWrap = $("passWrap");
+  const passwordInput = $("password");
+  const linkForgot = $("linkForgot");
+  const linkBackSignIn = $("linkBackSignIn");
+  const btnEmailPrimary = $("btnEmailPrimary");
+  const authMsg = $("authMsg");
+
+  // Toasts
+  const toasts = $("toasts");
+  function toast(text){
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = text;
+    toasts.appendChild(t);
+    setTimeout(() => t.remove(), 2200);
+  }
+
+  // Date key for daily leaderboard (PH time: +08)
+  function getPHDateKey(){
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    const ph = new Date(utc + 8 * 3600000);
+    const y = ph.getFullYear();
+    const m = String(ph.getMonth()+1).padStart(2,"0");
+    const d = String(ph.getDate()).padStart(2,"0");
+    return `${y}-${m}-${d}`;
+  }
+
+  // Game state
+  const SIZE = 10;
+  let grid = makeEmptyGrid();
+  let score = 0;
+  let best = Number(localStorage.getItem("bb_best") || "0");
+  let pieces = [];
+  let selectedPieceIndex = -1;
+  let hoverAnchor = null; // {r,c}
+  let user = null;
+
+  // Combo system
+  let combo = 0;
+  let lastClearAt = 0; // ms
+  const COMBO_WINDOW = 2500;
+
+  // Drag state
+  let dragging = null; // { idx, piece, pointerId }
+  const ghost = $("ghost");
+
+  function makeEmptyGrid(){
+    return Array.from({length: SIZE}, () => Array.from({length: SIZE}, () => 0));
+  }
+
+  function setScore(v){
+    score = v;
+    elScore.textContent = String(score);
+    if (score > best){
+      best = score;
+      localStorage.setItem("bb_best", String(best));
+      elBest.textContent = String(best);
+    }
+    btnSubmit.disabled = !user || score <= 0;
+  }
+
+  function lockGameUI(locked){
+    btnNew.disabled = locked;
+    btnSubmit.disabled = locked || score <= 0;
+    if (locked) elHint.textContent = "Sign in to start playing.";
+  }
+
+  function resetGame(){
+    grid = makeEmptyGrid();
+    setScore(0);
+    pieces = [randomPiece(), randomPiece(), randomPiece()];
+    selectedPieceIndex = -1;
+    hoverAnchor = null;
+    combo = 0;
+    lastClearAt = 0;
+    render();
+  }
+
+  // Pieces
+  const SHAPES = [
+    [[0,0]],
+    [[0,0],[1,0]],
+    [[0,0],[1,0],[2,0]],
+    [[0,0],[1,0],[2,0],[3,0]],
+    [[0,0],[1,0],[2,0],[3,0],[4,0]],
+    [[0,0],[0,1]],
+    [[0,0],[0,1],[0,2]],
+    [[0,0],[0,1],[0,2],[0,3]],
+    [[0,0],[0,1],[0,2],[0,3],[0,4]],
+    [[0,0],[0,1],[1,0],[1,1]],
+    [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2]],
+    [[0,0],[1,0],[2,0],[2,1]],
+    [[0,1],[1,1],[2,1],[2,0]],
+    [[0,0],[0,1],[1,0],[2,0]],
+    [[0,0],[0,1],[1,1],[2,1]],
+    [[0,0],[0,1],[0,2],[1,1]],
+    [[0,1],[1,0],[1,1],[1,2]],
+    [[0,0],[0,1],[1,1],[1,2]],
+    [[0,2],[0,1],[1,1],[1,0]],
+    [[0,1],[1,0],[1,1],[1,2],[2,1]]
+  ];
+
+  function randomPiece(){
+    const pool = [];
+    for (const s of SHAPES){
+      const w = s.length <= 2 ? 6 : s.length <= 4 ? 4 : 2;
+      for (let i=0;i<w;i++) pool.push(s);
+    }
+    return normalizeShape(pool[Math.floor(Math.random()*pool.length)]);
+  }
+
+  function normalizeShape(cells){
+    let minR = Infinity, minC = Infinity;
+    for (const [r,c] of cells){ minR = Math.min(minR,r); minC = Math.min(minC,c); }
+    const out = cells.map(([r,c]) => [r-minR, c-minC]);
+    return { cells: out };
+  }
+
+  function pieceFits(piece, anchorR, anchorC){
+    for (const [dr,dc] of piece.cells){
+      const r = anchorR + dr, c = anchorC + dc;
+      if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) return false;
+      if (grid[r][c]) return false;
+    }
+    return true;
+  }
+
+  function placePiece(piece, anchorR, anchorC){
+    for (const [dr,dc] of piece.cells){
+      grid[anchorR+dr][anchorC+dc] = 1;
+    }
+  }
+
+  // Returns: { clearedRows: number[], clearedCols: number[] }
+  function getFullLines(){
+    const fullRows = [];
+    const fullCols = [];
+
+    for (let r=0;r<SIZE;r++){
+      if (grid[r].every(v => v === 1)) fullRows.push(r);
+    }
+    for (let c=0;c<SIZE;c++){
+      let ok = true;
+      for (let r=0;r<SIZE;r++){ if (!grid[r][c]) { ok=false; break; } }
+      if (ok) fullCols.push(c);
+    }
+    return { fullRows, fullCols };
+  }
+
+  function clearLines(fullRows, fullCols){
+    for (const r of fullRows){
+      for (let c=0;c<SIZE;c++) grid[r][c] = 0;
+    }
+    for (const c of fullCols){
+      for (let r=0;r<SIZE;r++) grid[r][c] = 0;
+    }
+  }
+
+  function anyMovePossible(){
+    for (const p of pieces){
+      if (!p) continue;
+      for (let r=0;r<SIZE;r++){
+        for (let c=0;c<SIZE;c++){
+          if (pieceFits(p, r, c)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Rendering
+  function render(){
+    elBest.textContent = String(best);
+
+    // Board
+    elBoard.innerHTML = "";
+    for (let r=0;r<SIZE;r++){
+      for (let c=0;c<SIZE;c++){
+        const cell = document.createElement("div");
+        cell.className = "cell" + (grid[r][c] ? " filled" : "");
+        cell.dataset.r = String(r);
+        cell.dataset.c = String(c);
+
+        const pIdx = (dragging?.idx ?? selectedPieceIndex);
+        const draggingPiece = (dragging?.piece ?? (pIdx>=0 ? pieces[pIdx] : null));
+
+        if (pIdx >= 0 && draggingPiece && hoverAnchor){
+          const p = draggingPiece;
+          const {r:ar, c:ac} = hoverAnchor;
+          let on = false;
+          for (const [dr,dc] of p.cells){
+            if (ar+dr === r && ac+dc === c) { on = true; break; }
+          }
+          if (on){
+            cell.classList.add(pieceFits(p, ar, ac) ? "preview-ok" : "preview-bad");
+          }
+        }
+
+        cell.addEventListener("pointerenter", () => {
+          if (!user) return;
+          hoverAnchor = { r, c };
+          render();
+        });
+
+        cell.addEventListener("pointermove", (e) => {
+          if (!user) return;
+          if (!dragging) return;
+          // While dragging, keep hoverAnchor synced to pointer position (handled by global move too)
+          e.preventDefault();
+        });
+
+        cell.addEventListener("click", () => {
+          if (!user) return;
+          // Tap-to-place fallback (works even without drag)
+          tryPlaceAt(r,c);
+        });
+
+        elBoard.appendChild(cell);
+      }
+    }
+
+    // Pieces
+    elPieces.innerHTML = "";
+    pieces.forEach((p, idx) => {
+      const wrap = document.createElement("div");
+      wrap.className = "piece" + (idx === selectedPieceIndex ? " selected" : "");
+      wrap.dataset.idx = String(idx);
+
+      const g = document.createElement("div");
+      g.className = "pieceGrid";
+
+      for (let pr=0;pr<5;pr++){
+        for (let pc=0;pc<5;pc++){
+          const c = document.createElement("div");
+          c.className = "pCell";
+          if (p){
+            for (const [dr,dc] of p.cells){
+              if (dr === pr && dc === pc) { c.classList.add("on"); break; }
+            }
+          }
+          g.appendChild(c);
+        }
+      }
+      wrap.appendChild(g);
+
+      // tap select
+      wrap.addEventListener("click", () => {
+        if (!user) return;
+        if (!p) return;
+        selectedPieceIndex = (selectedPieceIndex === idx) ? -1 : idx;
+        render();
+      });
+
+      // drag start
+      wrap.addEventListener("pointerdown", (e) => {
+        if (!user) return;
+        if (!p) return;
+        e.preventDefault();
+
+        wrap.setPointerCapture?.(e.pointerId);
+        dragging = { idx, piece: p, pointerId: e.pointerId };
+        selectedPieceIndex = idx;
+
+        // Build ghost
+        ghost.innerHTML = "";
+        const ghostPiece = document.createElement("div");
+        ghostPiece.className = "piece";
+        ghostPiece.style.minWidth = "140px";
+        ghostPiece.appendChild(g.cloneNode(true));
+        ghost.appendChild(ghostPiece);
+
+        moveGhost(e.clientX, e.clientY);
+        render();
+      });
+
+      elPieces.appendChild(wrap);
+    });
+
+    // Hint
+    if (!user){
+      elHint.textContent = "Sign in to start playing.";
+    } else if (!anyMovePossible()){
+      elHint.innerHTML = `<span style="color: rgba(239,68,68,.95); font-weight:900">Game over.</span> Tap <b>New game</b>.`;
+    } else if (dragging){
+      elHint.textContent = "Drop the piece onto the board.";
+    } else if (selectedPieceIndex >= 0){
+      elHint.textContent = "Drag it onto the board (or tap a cell to place).";
+    } else {
+      elHint.textContent = "Drag a piece onto the board. Clear full rows/columns to score.";
+    }
+  }
+
+  function tryPlaceAt(r,c){
+    const pIdx = selectedPieceIndex;
+    if (pIdx < 0) return;
+    const p = pieces[pIdx];
+    if (!p) return;
+
+    if (!pieceFits(p, r, c)) return;
+
+    placeAndScore(pIdx, p, r, c);
+  }
+
+  function placeAndScore(pIdx, p, r, c){
+    placePiece(p, r, c);
+
+    const base = p.cells.length * 5;
+
+    const { fullRows, fullCols } = getFullLines();
+    const lines = fullRows.length + fullCols.length;
+
+    // Combo logic
+    let comboBonus = 0;
+    if (lines > 0){
+      const now = Date.now();
+      combo = (now - lastClearAt <= COMBO_WINDOW) ? combo + 1 : 1;
+      lastClearAt = now;
+
+      // line bonus + combo multiplier
+      const lineBonus = lines * 60 + (lines >= 2 ? 50*(lines-1) : 0);
+      comboBonus = Math.floor(lineBonus * (1 + (combo-1)*0.35));
+
+      // flash highlight for cleared rows/cols
+      flashLines(fullRows, fullCols);
+
+      clearLines(fullRows, fullCols);
+
+      if (combo >= 2){
+        toast(`🔥 COMBO x${combo}! +${comboBonus}`);
+      } else {
+        toast(`✅ CLEAR +${comboBonus}`);
+      }
+    } else {
+      // If no clear, combo decays (soft reset)
+      if (combo > 0) combo = 0;
+    }
+
+    setScore(score + base + comboBonus);
+
+    pieces[pIdx] = null;
+    selectedPieceIndex = -1;
+
+    if (pieces.every(x => x === null)){
+      pieces = [randomPiece(), randomPiece(), randomPiece()];
+    }
+
+    render();
+  }
+
+  function flashLines(rows, cols){
+    // Flash cells by adding class briefly (we do it before clearing)
+    const children = Array.from(elBoard.children);
+    const idx = (r,c) => r*SIZE + c;
+
+    for (const r of rows){
+      for (let c=0;c<SIZE;c++){
+        children[idx(r,c)]?.classList.add("flash");
+      }
+    }
+    for (const c of cols){
+      for (let r=0;r<SIZE;r++){
+        children[idx(r,c)]?.classList.add("flash");
+      }
+    }
+    // class auto-fades via animation
+  }
+
+  // Drag helpers
+  function moveGhost(x,y){
+    ghost.style.transform = `translate(${x + 12}px, ${y + 12}px)`;
+  }
+
+  function pointerToBoardCell(clientX, clientY){
+    const rect = elBoard.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
+
+    const cellW = rect.width / SIZE;
+    const cellH = rect.height / SIZE;
+    const c = Math.floor(x / cellW);
+    const r = Math.floor(y / cellH);
+    return { r, c };
+  }
+
+  window.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    moveGhost(e.clientX, e.clientY);
+
+    const cell = pointerToBoardCell(e.clientX, e.clientY);
+    hoverAnchor = cell;
+    render();
+  }, { passive:false });
+
+  window.addEventListener("pointerup", (e) => {
+    if (!dragging) return;
+
+    // Place if pointer is on board and fits
+    const cell = pointerToBoardCell(e.clientX, e.clientY);
+    if (cell){
+      const { idx, piece } = dragging;
+      if (pieces[idx] && pieceFits(piece, cell.r, cell.c)){
+        placeAndScore(idx, piece, cell.r, cell.c);
+      } else {
+        render();
+      }
+    }
+
+    // End drag
+    dragging = null;
+    ghost.innerHTML = "";
+    ghost.style.transform = "translate(-9999px,-9999px)";
+    hoverAnchor = null;
+    render();
+  }, { passive:false });
+
+  // Leaderboard
+  const lbStatus = $("lbStatus");
+  const lbEl = $("lb");
+  let lbMode = "today"; // today | all
+  let unsubscribe = null;
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, (m) => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[m]));
+  }
+
+  function leaderboardPath(){
+    if (lbMode === "all") return "leaderboardAll";
+    return `leaderboardDaily/${getPHDateKey()}`;
+  }
+
+  function setLBMode(m){
+    lbMode = m;
+    lbBadge.textContent = (lbMode === "all") ? "All-time" : "Today";
+    btnLBToday.classList.toggle("secondary", lbMode !== "today");
+    btnLBAll.classList.toggle("secondary", lbMode !== "all");
+    attachLeaderboardListener();
+  }
+
+  function attachLeaderboardListener(){
+    // Detach previous listener cleanly
+    if (unsubscribe){
+      unsubscribe();
+      unsubscribe = null;
+    }
+
+    lbStatus.textContent = "Loading…";
+    lbEl.innerHTML = "";
+
+    const path = leaderboardPath();
+    const q = query(ref(db, path), orderByChild("best"), limitToLast(10));
+
+    const handler = (snap) => {
+      const arr = [];
+      snap.forEach(child => arr.push(child.val()));
+      arr.sort((a,b) => (b?.best||0) - (a?.best||0));
+
+      lbEl.innerHTML = "";
+      if (arr.length === 0){
+        lbStatus.textContent = "No scores yet.";
+        return;
+      }
+      lbStatus.textContent = "Updated";
+
+      arr.forEach((row, i) => {
+        const item = document.createElement("div");
+        item.className = "lbItem";
+        item.innerHTML = `
+          <div class="rank">#${i+1}</div>
+          <div class="name">${escapeHtml(row?.name || "Unknown")}</div>
+          <div class="score">${Number(row?.best || 0)}</div>
+        `;
+        lbEl.appendChild(item);
+      });
+    };
+
+    const errorHandler = (err) => {
+      lbStatus.textContent = "Leaderboard error";
+      console.error("Leaderboard listener error:", err);
+    };
+
+    onValue(q, handler, errorHandler);
+
+    // unsubscribe
+    unsubscribe = () => off(q, "value", handler);
+  }
+
+  async function refreshLeaderboardOnce(){
+    lbStatus.textContent = "Refreshing…";
+    try{
+      const path = leaderboardPath();
+      const q = query(ref(db, path), orderByChild("best"), limitToLast(10));
+      const snap = await get(q);
+
+      const arr = [];
+      snap.forEach(child => arr.push(child.val()));
+      arr.sort((a,b) => (b?.best||0) - (a?.best||0));
+
+      lbEl.innerHTML = "";
+      if (arr.length === 0){
+        lbStatus.textContent = "No scores yet.";
+        return;
+      }
+      lbStatus.textContent = "Updated";
+      arr.forEach((row, i) => {
+        const item = document.createElement("div");
+        item.className = "lbItem";
+        item.innerHTML = `
+          <div class="rank">#${i+1}</div>
+          <div class="name">${escapeHtml(row?.name || "Unknown")}</div>
+          <div class="score">${Number(row?.best || 0)}</div>
+        `;
+        lbEl.appendChild(item);
+      });
+    } catch(e){
+      lbStatus.textContent = "Refresh failed";
+      console.error("Refresh error:", e);
+    }
+  }
+
+  async function submitScore(){
+    if (!user) return;
+
+    const uid = user.uid;
+    const name = user.displayName || user.email || "Player";
+
+    // All-time (per user)
+    const allPath = ref(db, `leaderboardAll/${uid}`);
+    const allSnap = await get(allPath);
+    const prevAll = allSnap.exists() ? Number(allSnap.val()?.best || 0) : 0;
+    const newAll = Math.max(prevAll, score);
+
+    // Today (per user)
+    const dayKey = getPHDateKey();
+    const todayPath = ref(db, `leaderboardDaily/${dayKey}/${uid}`);
+    const todaySnap = await get(todayPath);
+    const prevToday = todaySnap.exists() ? Number(todaySnap.val()?.best || 0) : 0;
+    const newToday = Math.max(prevToday, score);
+
+    // Save both
+    const payloadBase = { uid, name, updatedAt: Date.now() };
+    await set(allPath, { ...payloadBase, best: newAll });
+    await set(todayPath, { ...payloadBase, best: newToday });
+
+    lbStatus.textContent = "Submitted!";
+    toast("🏁 Score submitted!");
+  }
+
+  // Auth gate
+  let mode = "signin"; // signin | signup | reset
+
+  function setMode(m){
+    mode = m;
+    tabSignIn.classList.toggle("active", mode === "signin");
+    tabSignUp.classList.toggle("active", mode === "signup");
+    tabReset.classList.toggle("active", mode === "reset");
+
+    nameWrap.style.display = (mode === "signup") ? "" : "none";
+    passWrap.style.display = (mode === "reset") ? "none" : "";
+
+    linkForgot.style.display = (mode === "signin") ? "" : "none";
+    linkBackSignIn.style.display = (mode !== "signin") ? "" : "none";
+
+    btnEmailPrimary.textContent =
+      mode === "signin" ? "Sign in" :
+      mode === "signup" ? "Create account" :
+      "Send reset email";
+
+    showAuthMsg("");
+  }
+
+  function showAuthMsg(text, kind=""){
+    if (!text){
+      authMsg.style.display = "none";
+      authMsg.textContent = "";
+      authMsg.className = "msg muted";
+      return;
+    }
+    authMsg.style.display = "";
+    authMsg.textContent = text;
+    authMsg.className = "msg " + (kind === "ok" ? "ok" : kind === "err" ? "err" : "muted");
+  }
+
+  function niceAuthError(e){
+    const code = e?.code || "";
+    if (code.includes("auth/invalid-email")) return "Invalid email address.";
+    if (code.includes("auth/user-not-found")) return "No account found for that email.";
+    if (code.includes("auth/wrong-password")) return "Incorrect password.";
+    if (code.includes("auth/weak-password")) return "Password is too weak (use at least 6 characters).";
+    if (code.includes("auth/email-already-in-use")) return "That email is already registered. Try Sign in.";
+    if (code.includes("auth/popup-blocked")) return "Popup blocked. Allow popups then try again.";
+    if (code.includes("auth/popup-closed-by-user")) return "Popup closed. Please try again.";
+    return e?.message || "Something went wrong.";
+  }
+
+  tabSignIn.addEventListener("click", () => setMode("signin"));
+  tabSignUp.addEventListener("click", () => setMode("signup"));
+  tabReset.addEventListener("click", () => setMode("reset"));
+  linkForgot.addEventListener("click", () => setMode("reset"));
+  linkBackSignIn.addEventListener("click", () => setMode("signin"));
+
+  btnGoogle.addEventListener("click", async () => {
+    showAuthMsg("Opening Google sign-in…");
+    try{ await signInWithPopup(auth, provider); }
+    catch(e){ console.error(e); showAuthMsg(niceAuthError(e), "err"); }
+  });
+
+  btnEmailPrimary.addEventListener("click", async () => {
+    const email = emailInput.value.trim();
+    const pass = passwordInput.value;
+    const displayName = displayNameInput.value.trim();
+    if (!email) return showAuthMsg("Please enter your email.", "err");
+
+    try{
+      if (mode === "reset"){
+        await sendPasswordResetEmail(auth, email);
+        showAuthMsg("Reset email sent. Check your inbox (and spam).", "ok");
+        return;
+      }
+
+      if (!pass) return showAuthMsg("Please enter your password.", "err");
+
+      if (mode === "signin"){
+        showAuthMsg("Signing in…");
+        await signInWithEmailAndPassword(auth, email, pass);
+        return;
+      }
+
+      showAuthMsg("Creating account…");
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      const name = displayName || email.split("@")[0].slice(0, 30);
+      await updateProfile(cred.user, { displayName: name });
+
+    }catch(e){
+      console.error(e);
+      showAuthMsg(niceAuthError(e), "err");
+    }
+  });
+
+  btnLogout.addEventListener("click", async () => {
+    try{ await signOut(auth); } catch(e){ console.error(e); }
+  });
+
+  btnNew.addEventListener("click", () => { if (user) resetGame(); });
+  btnSubmit.addEventListener("click", () => { if (user) submitScore(); });
+  btnRefresh.addEventListener("click", refreshLeaderboardOnce);
+  btnLBToday.addEventListener("click", () => setLBMode("today"));
+  btnLBAll.addEventListener("click", () => setLBMode("all"));
+
+  onAuthStateChanged(auth, (u) => {
+    user = u || null;
+
+    if (user){
+      gate.style.display = "none";
+      btnLogout.style.display = "";
+      elPlayerName.textContent = user.displayName || user.email || "Player";
+      lockGameUI(false);
+      resetGame();
+      attachLeaderboardListener();
+      toast("👋 Welcome!");
+    } else {
+      gate.style.display = "";
+      btnLogout.style.display = "none";
+      elPlayerName.textContent = "—";
+      lockGameUI(true);
+
+      // show leaderboard even when logged out
+      attachLeaderboardListener();
+
+      grid = makeEmptyGrid();
+      pieces = [randomPiece(), randomPiece(), randomPiece()];
+      selectedPieceIndex = -1;
+      hoverAnchor = null;
+      setScore(0);
+      render();
+    }
+  });
+
+  // Boot
+  setMode("signin");
+  setLBMode("today");
+  render();
+</script>
+</body>
+</html>
